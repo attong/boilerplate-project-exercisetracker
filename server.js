@@ -3,7 +3,8 @@ const app = express()
 const bodyParser = require('body-parser')
 
 const cors = require('cors')
-
+const moment = require('moment')
+moment().format();
 const mongoose = require('mongoose')
 //mongoose.connect(process.env.MLAB_URI || 'mongodb://localhost/exercise-track' )
 
@@ -29,7 +30,7 @@ var users = mongoose.model("user", exerciseSchema);
 
 
 app.post('/api/exercise/new-user', (req,res)=>{
-	if (!req.body) return res.sendStatus(400);
+	if (!req.body || req.body.username == '') return res.sendStatus(400);
 	// verify that parsing works
 	users.findOne({user: req.body.username}, (err,data)=>{
 		if (err){
@@ -37,11 +38,37 @@ app.post('/api/exercise/new-user', (req,res)=>{
 		} else if (data == null){
 			var newUser = new users({user: req.body.username, excercises:[]});
 			newUser.save();
-			res.json({success: req.body.username + " added to database"});
+			return res.json({success: req.body.username + " added to database"});
 		} else{
-			res.json({err: req.body.username + " is already in the system"});
+			return res.json({err: req.body.username + " is already in the system"});
 		}
 	});
+})
+
+app.post('/api/exercise/add', (req,res)=>{
+	if (!req.body){ return res.sendStatus(400)};
+	users.findOne({user: req.body.userId}, (err,data)=>{
+		if (err){
+			throw err;
+		} else if (data == null){
+			return res.json({error: "user: "+ req.body.userId + " is not in the database"});
+		} else{
+			//verify date is in correct format
+			if (!(moment(req.body.date, "YYYY-MM-DD", true).isValid())){
+				return res.json({error: req.body.date +" is not in the correct date format"});
+			} else if (isNaN(req.body.duration)){
+				return res.json({"error": "duration must be a number"})
+			} else{
+				var entry = {"description": req.body.description, "duration": req.body.duration, "date": req.body.date};
+				var temp = data.excercises;
+				temp.push(entry);
+				data.excercises = temp;
+				data.save();
+				return res.json({"success": entry successful});
+			}
+		}
+	});
+	//{"userId":"anthony","description":"run","duration":"5","date":"2018-01-01"}
 })
 
 // Not found middleware
