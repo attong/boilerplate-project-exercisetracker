@@ -24,7 +24,7 @@ app.get('/', (req, res) => {
 var Schema = mongoose.Schema;
 var exerciseSchema = new Schema({
   user: {type: String, unique: true},
-  excercises: {type: Array}//initialize as empty array, update as we add more
+  excercises: [{description: String, duration: Number, date: Date}]//initialize as empty array, update as we add more
 });
 var users = mongoose.model("user", exerciseSchema);
 
@@ -59,17 +59,43 @@ app.post('/api/exercise/add', (req,res)=>{
 			} else if (isNaN(req.body.duration)){
 				return res.json({"error": "duration must be a number"})
 			} else{
-				var entry = {"description": req.body.description, "duration": req.body.duration, "date": req.body.date};
+				var date = new Date(req.body.date);
+				var entry = {"description": req.body.description, "duration": req.body.duration, "date": date};
 				var temp = data.excercises;
 				temp.push(entry);
 				data.excercises = temp;
 				data.save();
-				return res.json({"success": entry successful});
+				return res.json({"success": "entry successful"});
 			}
 		}
 	});
-	//{"userId":"anthony","description":"run","duration":"5","date":"2018-01-01"}
 })
+
+app.get('/api/exercise/log', (req,res)=>{
+	if (!req.query.userId || req.query.userId==null){
+		return res.json({"error":"please provide userId"});
+	} else{
+		let query = [{$match :{'user': req.query.userId}},{$unwind: '$excercises'}];
+		if (req.query.from){
+			query.push({$match: {"excercises.date": {$gte: new Date(req.query.from)}}});
+		}
+		if (req.query.to){
+			query.push({$match: {"excercises.date": {$lte: new Date(req.query.to)}}});
+		}
+		if (req.query.limit){
+			query.push({$limit: Number(req.query.limit)});
+		}
+		users.aggregate(query, (err,data)=>{
+			if(err){
+				res.json(err);
+			} else{
+				res.json(data);
+			}
+		})
+	}
+	//GET /api/exercise/log?userId=anthony&from=2018-10-10&to=10-30-2018&limit=1
+
+});
 
 // Not found middleware
 app.use((req, res, next) => {
